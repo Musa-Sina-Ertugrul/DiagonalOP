@@ -309,3 +309,4 @@ yarn.lock
 *.zip
 *.rar
 
+.vscode

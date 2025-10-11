@@ -1,5 +1,7 @@
 #include <torch/extension.h>
 #include <cuda_runtime.h>
+#include "diagonal_utils.h"
+#include "definitions.h"
 
 void check_tensor(const torch::Tensor& input){
     int64_t dim = input.dim();

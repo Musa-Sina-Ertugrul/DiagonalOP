@@ -7,10 +7,10 @@ All operations are performed using custom kernels for better performance.
 from functools import reduce
 from operator import mul
 import torch
-from .load import _diagonal_kernel
+import ab_kernels_cuda
 
 
-class AddDiagonal(torch.autograd.Function):
+class _AddDiagonal(torch.autograd.Function):
     """Autograd function for adding a value to the diagonal elements of a matrix."""
 
     @staticmethod
@@ -30,7 +30,7 @@ class AddDiagonal(torch.autograd.Function):
         if not isinstance(value, torch.Tensor):
             value = torch.tensor(value, device=input.device, dtype=input.dtype)
         ctx.value = value
-        return _diagonal_kernel.add_diagonal(input, value)
+        return ab_kernels_cuda.add_diagonal(input, value)
 
     @staticmethod
     def backward(ctx, grad_output: torch.Tensor):
@@ -56,10 +56,10 @@ def diagonal_add(input, value):
         >>> x = torch.randn(3, 3)
         >>> result = diagonal_add(x, 2.0)
     """
-    return AddDiagonal.apply(input, value)
+    return _AddDiagonal.apply(input, value)
 
 
-class SubDiagonal(torch.autograd.Function):
+class _SubDiagonal(torch.autograd.Function):
     """Autograd function for subtracting a value from the diagonal elements of a matrix."""
 
     @staticmethod
@@ -69,7 +69,7 @@ class SubDiagonal(torch.autograd.Function):
         if not isinstance(value, torch.Tensor):
             value = torch.tensor(value, device=input.device, dtype=input.dtype)
         ctx.value = value
-        return _diagonal_kernel.sub_diagonal(input, value)
+        return ab_kernels_cuda.sub_diagonal(input, value)
 
     @staticmethod
     def backward(ctx, grad_output: torch.Tensor):
@@ -95,10 +95,10 @@ def diagonal_sub(input, value):
         >>> x = torch.randn(3, 3)
         >>> result = diagonal_sub(x, 1.5)
     """
-    return SubDiagonal.apply(input, value)
+    return _SubDiagonal.apply(input, value)
 
 
-class MulDiagonal(torch.autograd.Function):
+class _MulDiagonal(torch.autograd.Function):
     """Autograd function for multiplying diagonal elements of a matrix by a value."""
 
     @staticmethod
@@ -106,17 +106,18 @@ class MulDiagonal(torch.autograd.Function):
         if not isinstance(value, torch.Tensor):
             value = torch.tensor(value, device=input.device, dtype=input.dtype)
         ctx.value = value
-        ctx.input = input
-        return _diagonal_kernel.mul_diagonal(input, value)
+        ctx.save_for_backward(input)
+        return ab_kernels_cuda.mul_diagonal(input, value)
 
     @staticmethod
     def backward(ctx, grad_output: torch.Tensor):
         grad_value = None
-        grad_output = _diagonal_kernel.mul_diagonal(grad_output, ctx.value)
+        grad_output = ab_kernels_cuda.mul_diagonal(grad_output, ctx.value)
         if ctx.needs_input_grad[1]:
-            grad_value = grad_output.mul(ctx.input)
+            (input,) = ctx.saved_tensors
+            grad_value = grad_output.mul(input)
             if ctx.value.dim() == 0:
-                grad_value = _diagonal_kernel.sum_diagonal(grad_value)
+                grad_value = ab_kernels_cuda.sum_diagonal(grad_value)
         return grad_output, grad_value
 
 
@@ -134,10 +135,10 @@ def diagonal_mul(input, value):
         >>> x = torch.randn(3, 3)
         >>> result = diagonal_mul(x, 0.5)
     """
-    return MulDiagonal.apply(input, value)
+    return _MulDiagonal.apply(input, value)
 
 
-class DivDiagonal(torch.autograd.Function):
+class _DivDiagonal(torch.autograd.Function):
     """Autograd function for dividing diagonal elements of a matrix by a value."""
 
     @staticmethod
@@ -145,20 +146,21 @@ class DivDiagonal(torch.autograd.Function):
         if not isinstance(value, torch.Tensor):
             value = torch.tensor(value, device=input.device, dtype=input.dtype)
         ctx.value = value
-        ctx.input = input
-        return _diagonal_kernel.mul_diagonal(input, value)
+        ctx.save_for_backward(input)
+        return ab_kernels_cuda.div_diagonal(input, value)
 
     @staticmethod
     def backward(ctx, grad_output: torch.Tensor):
         grad_value = None
-        grad_output = _diagonal_kernel.div_diagonal(grad_output, ctx.value)
+        grad_output = ab_kernels_cuda.div_diagonal(grad_output, ctx.value)
         if ctx.needs_input_grad[1]:
-            grad_value = _diagonal_kernel.div_diagonal(
-                grad_output.mul(ctx.input), ctx.value
-            ).sub(ctx.input)
-            grad_value = _diagonal_kernel.div_diagonal(grad_value, ctx.value.pow(2))
+            (input,) = ctx.saved_tensors
+            grad_value = ab_kernels_cuda.div_diagonal(
+                grad_output.mul(input), ctx.value
+            ).sub(input)
+            grad_value = ab_kernels_cuda.div_diagonal(grad_value, ctx.value.pow(2))
             if ctx.value.dim() == 0:
-                grad_value = _diagonal_kernel.sum_diagonal(grad_value)
+                grad_value = ab_kernels_cuda.sum_diagonal(grad_value)
         return grad_output, grad_value
 
 
@@ -176,17 +178,17 @@ def diagonal_div(input, value):
         >>> x = torch.randn(3, 3)
         >>> result = diagonal_div(x, 2.0)
     """
-    return DivDiagonal.apply(input, value)
+    return _DivDiagonal.apply(input, value)
 
 
-class SumDiagonal(torch.autograd.Function):
+class _SumDiagonal(torch.autograd.Function):
     """Autograd function for summing the diagonal elements of a matrix."""
 
     @staticmethod
     def forward(ctx, input: torch.Tensor):
         ctx.input_shape = input.shape
 
-        return _diagonal_kernel.sum_diagonal(input)
+        return ab_kernels_cuda.sum_diagonal(input)
 
     @staticmethod
     def backward(ctx, grad_output: torch.Tensor):
@@ -224,4 +226,4 @@ def diagonal_sum(input):
         >>> x = torch.randn(3, 3)
         >>> result = diagonal_sum(x)
     """
-    return SumDiagonal.apply(input)
+    return _SumDiagonal.apply(input)

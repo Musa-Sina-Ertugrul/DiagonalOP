@@ -2,12 +2,9 @@
 #include <cuda_runtime.h>
 #include <c10/cuda/CUDAStream.h>
 #include <c10/cuda/CUDAGuard.h>
-
-#ifndef THREAD_COUNT
-    #define THREAD_COUNT 128
-#endif
-
-extern void check_tensor(const torch::Tensor&);
+#include "definitions.h"
+#include "diagonal_utils.h"
+#include "diagonal_sum.h"
 
 template<typename T>
 __global__
@@ -17,8 +14,8 @@ sum_diagonal_kernel(const T* input, T* output, int64_t flatten_dim, int64_t len)
     T* sdata = reinterpret_cast<T*>(shared_bytes);
 
     int64_t tid = threadIdx.x;
-    int64_t i = blockIdx.x * blockDim.x + threadIdx.x;
-    int64_t batch_idx = blockIdx.y;
+    int64_t batch_idx = blockIdx.x;
+    int64_t i = threadIdx.x;
 
     if (i < len) {
         sdata[tid] = input[batch_idx * len * len + i * len + i];
@@ -57,18 +54,16 @@ sum_diagonal(torch::Tensor input) {
     torch::Tensor output = torch::zeros({flatten_dim}, output_options);
 
     c10::cuda::CUDAStream stream = c10::cuda::getCurrentCUDAStream(input.device().index());
-    
-    size_t shared_mem_size = (THREAD_COUNT+1) * sizeof(input.scalar_type()); // Veri tipine göre ayarla
 
     AT_DISPATCH_FLOATING_TYPES_AND(at::ScalarType::BFloat16, input.scalar_type(), "sum_diagonal", [&]{
         auto* input_ptr = input.data_ptr<scalar_t>();
         auto* output_ptr = output.data_ptr<scalar_t>();
-        
+
+        size_t shared_mem_size = THREAD_COUNT * sizeof(scalar_t);
+
         sum_diagonal_kernel<scalar_t><<<flatten_dim, THREAD_COUNT, shared_mem_size, stream>>>(input_ptr, output_ptr, flatten_dim, len);
     });
 
-    cudaStreamSynchronize(stream);
-    
     auto final_shape = input_shape.slice(0, input_shape.size() - 2);
     return output.view(final_shape);
 }

@@ -1,3 +1,9 @@
+"""Distributed data parallel test for diagonal_sum operation.
+
+This module tests the diagonal_sum function in a multi-GPU distributed setting
+using PyTorch's DistributedDataParallel (DDP).
+"""
+
 import sys
 
 sys.path.append("./")
@@ -10,26 +16,28 @@ import torch.nn.functional as F
 import torch.distributed as dist
 import torch.multiprocessing as mp
 from torch.nn.parallel import DistributedDataParallel as DDP
-from diagonal import diagonal_mul
+from diagonal import *
 
 
 def _create_model():
+    """Create a simple test model that uses diagonal_sum for DDP testing."""
+
     class Model(torch.nn.Module):
 
         def __init__(self, *args, **kwargs):
             super().__init__(*args, **kwargs)
             self.linear_1 = torch.nn.Linear(10, 10)
-            self.linear_2 = torch.nn.Linear(10, 1)
 
         def forward(self, x):
             x = F.relu(self.linear_1(x))
-            x = diagonal_mul(x, 1.0)
-            return F.sigmoid(self.linear_2(x))
+            x = diagonal_sum(x)
+            return F.sigmoid(x)
 
-    return Model()
+    return Model().to(torch.bfloat16)
 
 
 def _setup(rank, world_size):
+    """Initialize the distributed process group."""
     os.environ["MASTER_ADDR"] = "localhost"
     os.environ["MASTER_PORT"] = "12355"
 
@@ -38,23 +46,24 @@ def _setup(rank, world_size):
 
 
 def _cleanup():
+    """Clean up the distributed process group."""
     dist.destroy_process_group()
 
 
 def _run(fn, world_size):
+    """Run distributed training using multiprocessing."""
     mp.spawn(fn=fn, args=(world_size,), nprocs=world_size, join=True)
 
 
 def _ddp_training(rank, world_size):
+    """Execute distributed training on a single process."""
     _setup(rank, world_size)
     model = _create_model().to(f"cuda:{rank}")
     ddp_model = DDP(model, device_ids=[rank])
     loss_fn = torch.nn.BCELoss()
     optimizer = torch.optim.AdamW(ddp_model.parameters())
-    x = torch.randn((10, 10), dtype=torch.float32, device=f"cuda:{rank}")
-    one = torch.tensor(
-        [0.5 for _ in range(10)], dtype=torch.float32, device=f"cuda:{rank}"
-    ).unsqueeze(dim=-1)
+    x = torch.randn((10, 10), dtype=torch.bfloat16, device=f"cuda:{rank}")
+    one = torch.tensor([0.5], dtype=torch.bfloat16, device=f"cuda:{rank}").squeeze()
 
     for _ in range(2):
         output = ddp_model(x)
