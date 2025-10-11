@@ -309,4 +309,9 @@ yarn.lock
 *.zip
 *.rar
 
+# Benchmark results
+benchmark_results/
+*.benchmark
+*.prof
+
 .vscode

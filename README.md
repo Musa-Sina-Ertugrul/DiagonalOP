@@ -1,16 +1,16 @@
 # DiagonalOP
 
-⚡ High-performance diagonal matrix operations with PyTorch autograd support.
+High-performance diagonal matrix operations with PyTorch autograd support.
 
-## ✨ Cool Features
+## Features
 
-- 🚀 **Custom CUDA Kernels** - Blazing fast GPU operations
-- 🔥 **Multi-GPU Support** - Works seamlessly with DistributedDataParallel (DDP)
-- ⚙️ **Torch Compile Ready** - Full compatibility with `torch.compile()`
-- 🎯 **Mixed Precision** - FP16/BF16 support for faster training
-- 📊 **Tensor Values** - Support for both scalar and tensor values
-- 🧠 **Full Autograd** - Complete gradient computation support
-- 📦 **Batch Operations** - Efficient batch processing
+- **Custom CUDA Kernels** - Blazing fast GPU operations
+- **Multi-GPU Support** - Works seamlessly with DistributedDataParallel (DDP)
+- **Torch Compile Ready** - Full compatibility with `torch.compile()`
+- **Mixed Precision** - FP16/BF16 support for faster training
+- **Tensor Values** - Support for both scalar and tensor values
+- **Full Autograd** - Complete gradient computation support
+- **Batch Operations** - Efficient batch processing
 
 ## Installation
 
@@ -96,8 +96,16 @@ pip install -e .[dev]
 
 ### Testing
 ```bash
-python -m test                    # Run all tests
-python -m unittest test.add_diagonal.test_add_diagonal  # Specific test
+python -m tests                  # Run all tests
+python -m unittest tests.add_diagonal.test_add_diagonal  # Specific test
+```
+
+### Benchmarking
+```bash
+python -m benchmark              # Run all benchmarks (default: 128x2048x2048)
+python -m benchmark --batch-size 64 --matrix-size 1024  # Custom config
+python -m benchmark --dtype float16 --no-gradient       # FP16, skip gradient
+python -m benchmark --help       # See all options
 ```
 
 ### Formatting

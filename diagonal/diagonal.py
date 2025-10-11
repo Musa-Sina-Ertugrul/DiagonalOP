@@ -34,6 +34,15 @@ class _AddDiagonal(torch.autograd.Function):
 
     @staticmethod
     def backward(ctx, grad_output: torch.Tensor):
+        """Backward pass: computes gradients for input and value.
+
+        Args:
+            ctx: Context object containing saved information from forward pass
+            grad_output: Gradient of the loss with respect to the output
+
+        Returns:
+            Tuple of (grad_input, grad_value) gradients
+        """
         grad_value = None
         if ctx.needs_input_grad[1]:
             grad_value = ctx.value.mul(reduce(mul, list(grad_output.shape[:-1])))
@@ -66,6 +75,16 @@ class _SubDiagonal(torch.autograd.Function):
     def forward(
         ctx, input: torch.Tensor, value: torch.Tensor | torch.NumberType | float | int
     ):
+        """Forward pass: subtracts value from diagonal elements.
+
+        Args:
+            ctx: Context object for storing information for backward pass
+            input: Input tensor (must be square matrix or batch of square matrices)
+            value: Value to subtract from diagonal elements (scalar or tensor)
+
+        Returns:
+            Tensor with value subtracted from diagonal elements
+        """
         if not isinstance(value, torch.Tensor):
             value = torch.tensor(value, device=input.device, dtype=input.dtype)
         ctx.value = value
@@ -73,6 +92,15 @@ class _SubDiagonal(torch.autograd.Function):
 
     @staticmethod
     def backward(ctx, grad_output: torch.Tensor):
+        """Backward pass: computes gradients for input and value.
+
+        Args:
+            ctx: Context object containing saved information from forward pass
+            grad_output: Gradient of the loss with respect to the output
+
+        Returns:
+            Tuple of (grad_input, grad_value) gradients
+        """
         grad_value = None
         if ctx.needs_input_grad[1]:
             grad_value = ctx.value.mul(reduce(mul, list(grad_output.shape[:-1])) * -1)
@@ -102,7 +130,19 @@ class _MulDiagonal(torch.autograd.Function):
     """Autograd function for multiplying diagonal elements of a matrix by a value."""
 
     @staticmethod
-    def forward(ctx, input, value: torch.Tensor):
+    def forward(
+        ctx, input: torch.Tensor, value: torch.Tensor | torch.NumberType | float | int
+    ):
+        """Forward pass: multiplies diagonal elements by value.
+
+        Args:
+            ctx: Context object for storing information for backward pass
+            input: Input tensor (must be square matrix or batch of square matrices)
+            value: Value to multiply diagonal elements by (scalar or tensor)
+
+        Returns:
+            Tensor with diagonal elements multiplied by value
+        """
         if not isinstance(value, torch.Tensor):
             value = torch.tensor(value, device=input.device, dtype=input.dtype)
         ctx.value = value
@@ -111,6 +151,15 @@ class _MulDiagonal(torch.autograd.Function):
 
     @staticmethod
     def backward(ctx, grad_output: torch.Tensor):
+        """Backward pass: computes gradients for input and value.
+
+        Args:
+            ctx: Context object containing saved information from forward pass
+            grad_output: Gradient of the loss with respect to the output
+
+        Returns:
+            Tuple of (grad_input, grad_value) gradients
+        """
         grad_value = None
         grad_output = ab_kernels_cuda.mul_diagonal(grad_output, ctx.value)
         if ctx.needs_input_grad[1]:
@@ -142,7 +191,19 @@ class _DivDiagonal(torch.autograd.Function):
     """Autograd function for dividing diagonal elements of a matrix by a value."""
 
     @staticmethod
-    def forward(ctx, input, value: torch.Tensor):
+    def forward(
+        ctx, input: torch.Tensor, value: torch.Tensor | torch.NumberType | float | int
+    ):
+        """Forward pass: divides diagonal elements by value.
+
+        Args:
+            ctx: Context object for storing information for backward pass
+            input: Input tensor (must be square matrix or batch of square matrices)
+            value: Value to divide diagonal elements by (scalar or tensor)
+
+        Returns:
+            Tensor with diagonal elements divided by value
+        """
         if not isinstance(value, torch.Tensor):
             value = torch.tensor(value, device=input.device, dtype=input.dtype)
         ctx.value = value
@@ -151,6 +212,15 @@ class _DivDiagonal(torch.autograd.Function):
 
     @staticmethod
     def backward(ctx, grad_output: torch.Tensor):
+        """Backward pass: computes gradients for input and value.
+
+        Args:
+            ctx: Context object containing saved information from forward pass
+            grad_output: Gradient of the loss with respect to the output
+
+        Returns:
+            Tuple of (grad_input, grad_value) gradients
+        """
         grad_value = None
         grad_output = ab_kernels_cuda.div_diagonal(grad_output, ctx.value)
         if ctx.needs_input_grad[1]:
@@ -186,31 +256,49 @@ class _SumDiagonal(torch.autograd.Function):
 
     @staticmethod
     def forward(ctx, input: torch.Tensor):
+        """Forward pass: sums diagonal elements.
+
+        Args:
+            ctx: Context object for storing information for backward pass
+            input: Input tensor (must be square matrix or batch of square matrices)
+
+        Returns:
+            Tensor containing the sum of diagonal elements
+        """
         ctx.input_shape = input.shape
 
         return ab_kernels_cuda.sum_diagonal(input)
 
     @staticmethod
     def backward(ctx, grad_output: torch.Tensor):
-        identity_matrix = torch.eye(
-            ctx.input_shape[-1], device=grad_output.device, dtype=grad_output.dtype
-        )
-        repeat_dims = [1 for _ in range(len(ctx.input_shape[:-2]))]
-        if len(repeat_dims) == 0:
-            grad_output = (
-                grad_output.unsqueeze(dim=-1)
-                .unsqueeze(dim=-1)
-                .repeat(ctx.input_shape[-1], ctx.input_shape[-1])
-                .matmul(identity_matrix)
-            )
+        """Backward pass: computes gradient for input.
+
+        Args:
+            ctx: Context object containing saved information from forward pass
+            grad_output: Gradient of the loss with respect to the output
+
+        Returns:
+            Gradient with respect to the input tensor
+        """
+        # Optimized backward: gradient is only non-zero on diagonal elements
+        # Instead of creating full matrices and using matmul, directly create the result
+        matrix_size = ctx.input_shape[-1]
+
+        # Create output gradient tensor filled with zeros
+        grad_input = torch.zeros(ctx.input_shape, device=grad_output.device, dtype=grad_output.dtype)
+
+        # Set diagonal elements to grad_output values
+        # This is much faster than creating identity matrix and doing matmul
+        if grad_output.dim() == 0:
+            # Scalar gradient - single matrix case
+            grad_input.diagonal(dim1=-2, dim2=-1).fill_(grad_output.item())
         else:
-            grad_output = (
-                grad_output.unsqueeze(dim=-1)
-                .unsqueeze(dim=-1)
-                .repeat(*repeat_dims, ctx.input_shape[-1], ctx.input_shape[-1])
-                .matmul(identity_matrix)
-            )
-        return grad_output
+            # Batch gradient case
+            # Reshape grad_output to broadcast correctly
+            grad_output_expanded = grad_output.view(*grad_output.shape, 1).expand(*grad_output.shape, matrix_size)
+            grad_input.diagonal(dim1=-2, dim2=-1).copy_(grad_output_expanded)
+
+        return grad_input
 
 
 def diagonal_sum(input):
