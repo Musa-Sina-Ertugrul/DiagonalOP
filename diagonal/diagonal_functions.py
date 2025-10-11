@@ -7,7 +7,7 @@ All operations are performed using custom kernels for better performance.
 from functools import reduce
 from operator import mul
 import torch
-import ab_kernels_cuda
+import diagonal_cuda
 
 
 class _AddDiagonal(torch.autograd.Function):
@@ -30,7 +30,7 @@ class _AddDiagonal(torch.autograd.Function):
         if not isinstance(value, torch.Tensor):
             value = torch.tensor(value, device=input.device, dtype=input.dtype)
         ctx.value = value
-        return ab_kernels_cuda.add_diagonal(input, value)
+        return diagonal_cuda.add_diagonal(input, value)
 
     @staticmethod
     def backward(ctx, grad_output: torch.Tensor):
@@ -88,7 +88,7 @@ class _SubDiagonal(torch.autograd.Function):
         if not isinstance(value, torch.Tensor):
             value = torch.tensor(value, device=input.device, dtype=input.dtype)
         ctx.value = value
-        return ab_kernels_cuda.sub_diagonal(input, value)
+        return diagonal_cuda.sub_diagonal(input, value)
 
     @staticmethod
     def backward(ctx, grad_output: torch.Tensor):
@@ -147,7 +147,7 @@ class _MulDiagonal(torch.autograd.Function):
             value = torch.tensor(value, device=input.device, dtype=input.dtype)
         ctx.value = value
         ctx.save_for_backward(input)
-        return ab_kernels_cuda.mul_diagonal(input, value)
+        return diagonal_cuda.mul_diagonal(input, value)
 
     @staticmethod
     def backward(ctx, grad_output: torch.Tensor):
@@ -161,12 +161,12 @@ class _MulDiagonal(torch.autograd.Function):
             Tuple of (grad_input, grad_value) gradients
         """
         grad_value = None
-        grad_output = ab_kernels_cuda.mul_diagonal(grad_output, ctx.value)
+        grad_output = diagonal_cuda.mul_diagonal(grad_output, ctx.value)
         if ctx.needs_input_grad[1]:
             (input,) = ctx.saved_tensors
             grad_value = grad_output.mul(input)
             if ctx.value.dim() == 0:
-                grad_value = ab_kernels_cuda.sum_diagonal(grad_value)
+                grad_value = diagonal_cuda.sum_diagonal(grad_value)
         return grad_output, grad_value
 
 
@@ -208,7 +208,7 @@ class _DivDiagonal(torch.autograd.Function):
             value = torch.tensor(value, device=input.device, dtype=input.dtype)
         ctx.value = value
         ctx.save_for_backward(input)
-        return ab_kernels_cuda.div_diagonal(input, value)
+        return diagonal_cuda.div_diagonal(input, value)
 
     @staticmethod
     def backward(ctx, grad_output: torch.Tensor):
@@ -222,15 +222,15 @@ class _DivDiagonal(torch.autograd.Function):
             Tuple of (grad_input, grad_value) gradients
         """
         grad_value = None
-        grad_output = ab_kernels_cuda.div_diagonal(grad_output, ctx.value)
+        grad_output = diagonal_cuda.div_diagonal(grad_output, ctx.value)
         if ctx.needs_input_grad[1]:
             (input,) = ctx.saved_tensors
-            grad_value = ab_kernels_cuda.div_diagonal(
+            grad_value = diagonal_cuda.div_diagonal(
                 grad_output.mul(input), ctx.value
             ).sub(input)
-            grad_value = ab_kernels_cuda.div_diagonal(grad_value, ctx.value.pow(2))
+            grad_value = diagonal_cuda.div_diagonal(grad_value, ctx.value.pow(2))
             if ctx.value.dim() == 0:
-                grad_value = ab_kernels_cuda.sum_diagonal(grad_value)
+                grad_value = diagonal_cuda.sum_diagonal(grad_value)
         return grad_output, grad_value
 
 
@@ -267,7 +267,7 @@ class _SumDiagonal(torch.autograd.Function):
         """
         ctx.input_shape = input.shape
 
-        return ab_kernels_cuda.sum_diagonal(input)
+        return diagonal_cuda.sum_diagonal(input)
 
     @staticmethod
     def backward(ctx, grad_output: torch.Tensor):

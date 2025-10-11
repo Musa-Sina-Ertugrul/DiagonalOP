@@ -15,7 +15,7 @@ Requirements:
     - CUDA toolkit (for GPU acceleration)
 """
 
-from .diagonal import (
+from .diagonal_functions import (
     diagonal_add,
     diagonal_mul,
     diagonal_div,

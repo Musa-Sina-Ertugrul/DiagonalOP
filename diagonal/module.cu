@@ -1,4 +1,4 @@
-#include <torch/all.h>
+#include <torch/extension.h>
 
 torch::Tensor add_diagonal(torch::Tensor input, torch::Tensor value);
 torch::Tensor mul_diagonal(torch::Tensor input, torch::Tensor value);

@@ -17,6 +17,7 @@ setup(
         CUDAExtension(
             name='diagonal_cuda',
             sources=[
+                os.path.join(setup_dir, './module.cu'),
                 os.path.join(setup_dir, './diagonal_add.cu'),
                 os.path.join(setup_dir, './diagonal_sum.cu'),
                 os.path.join(setup_dir, './diagonal_sub.cu'),
