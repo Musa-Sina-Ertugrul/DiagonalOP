@@ -135,6 +135,12 @@ class TestAdd(unittest.TestCase):
         if error_code:
             raise RuntimeError(f"ERROR: ddp exited with error code {error_code}")
 
+    def test_ddp_compiled(self):
+        """Test diagonal_add with distributed data parallel and torch.compile."""
+        error_code = subprocess.call(["python", "./tests/add_diagonal/_ddp.py", "compiled"])
+        if error_code:
+            raise RuntimeError(f"ERROR: ddp compiled exited with error code {error_code}")
+
     def test_array_tensor(self):
         """Test diagonal_add with tensor values instead of scalar."""
         identity_matrix = torch.eye(5, dtype=torch.bfloat16, device="cuda")

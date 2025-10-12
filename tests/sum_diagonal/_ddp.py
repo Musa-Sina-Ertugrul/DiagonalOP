@@ -74,14 +74,43 @@ def _ddp_training(rank, world_size):
     _cleanup()
 
 
+def _ddp_training_compiled(rank, world_size):
+    """Test DDP with torch.compile."""
+    _setup(rank, world_size)
+    model = _create_model().to(f"cuda:{rank}")
+    ddp_model = DDP(model, device_ids=[rank])
+    # Compile the model
+    compiled_model = torch.compile(ddp_model)
+    loss_fn = torch.nn.BCELoss()
+    optimizer = torch.optim.AdamW(compiled_model.parameters())
+    x = torch.randn((10, 10), dtype=torch.bfloat16, device=f"cuda:{rank}")
+    one = torch.tensor([0.5], dtype=torch.bfloat16, device=f"cuda:{rank}").squeeze()
+
+    for _ in range(2):
+        output = compiled_model(x)
+        loss = loss_fn(one, output)
+        loss.backward()
+        optimizer.step()
+        optimizer.zero_grad()
+    _cleanup()
+
+
 if __name__ == "__main__":
     sleep(0.5)
     world_size = torch.cuda.device_count()
     if world_size < 2:
         exit(0)
     world_size = 2
+
+    # Determine which test to run based on command line argument
+    import sys
+    test_type = sys.argv[1] if len(sys.argv) > 1 else "normal"
+
     try:
-        _run(_ddp_training, world_size)
+        if test_type == "compiled":
+            _run(_ddp_training_compiled, world_size)
+        else:
+            _run(_ddp_training, world_size)
     except BaseException as e:
         _cleanup()
         print(e)

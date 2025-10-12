@@ -130,6 +130,12 @@ class Testsub(unittest.TestCase):
         if error_code:
             raise RuntimeError(f"ERROR: ddp exited with error code {error_code}")
 
+    def test_ddp_compiled(self):
+        """Test diagonal_sum with distributed data parallel and torch.compile."""
+        error_code = subprocess.call(["python", "./tests/sum_diagonal/_ddp.py", "compiled"])
+        if error_code:
+            raise RuntimeError(f"ERROR: ddp compiled exited with error code {error_code}")
+
     def test_edge_case_values(self):
         """Test diagonal_sum with edge case values: 2, 0, -2, -1."""
         # Test with value 2
