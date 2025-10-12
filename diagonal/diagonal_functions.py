@@ -9,6 +9,13 @@ from operator import mul
 import torch
 import diagonal_cuda
 
+# Import registry to register custom ops with torch.compile
+try:
+    from . import diagonal_ops_registry  # noqa: F401 - imported for side effects
+    _USE_REGISTERED_OPS = True
+except ImportError:
+    _USE_REGISTERED_OPS = False
+
 
 class _AddDiagonal(torch.autograd.Function):
     """Autograd function for adding a value to the diagonal elements of a matrix."""
@@ -30,6 +37,8 @@ class _AddDiagonal(torch.autograd.Function):
         if not isinstance(value, torch.Tensor):
             value = torch.tensor(value, device=input.device, dtype=input.dtype)
         ctx.value = value
+        if _USE_REGISTERED_OPS:
+            return torch.ops.diagonal_ops.add_diagonal(input, value)
         return diagonal_cuda.add_diagonal(input, value)
 
     @staticmethod
@@ -88,6 +97,8 @@ class _SubDiagonal(torch.autograd.Function):
         if not isinstance(value, torch.Tensor):
             value = torch.tensor(value, device=input.device, dtype=input.dtype)
         ctx.value = value
+        if _USE_REGISTERED_OPS:
+            return torch.ops.diagonal_ops.sub_diagonal(input, value)
         return diagonal_cuda.sub_diagonal(input, value)
 
     @staticmethod
@@ -147,6 +158,8 @@ class _MulDiagonal(torch.autograd.Function):
             value = torch.tensor(value, device=input.device, dtype=input.dtype)
         ctx.value = value
         ctx.save_for_backward(input)
+        if _USE_REGISTERED_OPS:
+            return torch.ops.diagonal_ops.mul_diagonal(input, value)
         return diagonal_cuda.mul_diagonal(input, value)
 
     @staticmethod
@@ -161,12 +174,19 @@ class _MulDiagonal(torch.autograd.Function):
             Tuple of (grad_input, grad_value) gradients
         """
         grad_value = None
-        grad_output = diagonal_cuda.mul_diagonal(grad_output, ctx.value)
+        if _USE_REGISTERED_OPS:
+            grad_output = torch.ops.diagonal_ops.mul_diagonal(grad_output, ctx.value)
+        else:
+            grad_output = diagonal_cuda.mul_diagonal(grad_output, ctx.value)
+
         if ctx.needs_input_grad[1]:
             (input,) = ctx.saved_tensors
             grad_value = grad_output.mul(input)
             if ctx.value.dim() == 0:
-                grad_value = diagonal_cuda.sum_diagonal(grad_value)
+                if _USE_REGISTERED_OPS:
+                    grad_value = torch.ops.diagonal_ops.sum_diagonal(grad_value)
+                else:
+                    grad_value = diagonal_cuda.sum_diagonal(grad_value)
         return grad_output, grad_value
 
 
@@ -208,6 +228,8 @@ class _DivDiagonal(torch.autograd.Function):
             value = torch.tensor(value, device=input.device, dtype=input.dtype)
         ctx.value = value
         ctx.save_for_backward(input)
+        if _USE_REGISTERED_OPS:
+            return torch.ops.diagonal_ops.div_diagonal(input, value)
         return diagonal_cuda.div_diagonal(input, value)
 
     @staticmethod
@@ -222,15 +244,27 @@ class _DivDiagonal(torch.autograd.Function):
             Tuple of (grad_input, grad_value) gradients
         """
         grad_value = None
-        grad_output = diagonal_cuda.div_diagonal(grad_output, ctx.value)
+        if _USE_REGISTERED_OPS:
+            grad_output = torch.ops.diagonal_ops.div_diagonal(grad_output, ctx.value)
+        else:
+            grad_output = diagonal_cuda.div_diagonal(grad_output, ctx.value)
+
         if ctx.needs_input_grad[1]:
             (input,) = ctx.saved_tensors
-            grad_value = diagonal_cuda.div_diagonal(
-                grad_output.mul(input), ctx.value
-            ).sub(input)
-            grad_value = diagonal_cuda.div_diagonal(grad_value, ctx.value.pow(2))
-            if ctx.value.dim() == 0:
-                grad_value = diagonal_cuda.sum_diagonal(grad_value)
+            if _USE_REGISTERED_OPS:
+                grad_value = torch.ops.diagonal_ops.div_diagonal(
+                    grad_output.mul(input), ctx.value
+                ).sub(input)
+                grad_value = torch.ops.diagonal_ops.div_diagonal(grad_value, ctx.value.pow(2))
+                if ctx.value.dim() == 0:
+                    grad_value = torch.ops.diagonal_ops.sum_diagonal(grad_value)
+            else:
+                grad_value = diagonal_cuda.div_diagonal(
+                    grad_output.mul(input), ctx.value
+                ).sub(input)
+                grad_value = diagonal_cuda.div_diagonal(grad_value, ctx.value.pow(2))
+                if ctx.value.dim() == 0:
+                    grad_value = diagonal_cuda.sum_diagonal(grad_value)
         return grad_output, grad_value
 
 
@@ -267,6 +301,8 @@ class _SumDiagonal(torch.autograd.Function):
         """
         ctx.input_shape = input.shape
 
+        if _USE_REGISTERED_OPS:
+            return torch.ops.diagonal_ops.sum_diagonal(input)
         return diagonal_cuda.sum_diagonal(input)
 
     @staticmethod
