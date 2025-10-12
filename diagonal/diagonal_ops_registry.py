@@ -152,10 +152,10 @@ def add_diagonal_abstract(input: torch.Tensor, value: torch.Tensor) -> torch.Ten
     """
     Shape inference for add_diagonal.
 
-    IMPORTANT: The actual CUDA kernel calls .contiguous() on both input and output,
-    so we must return a contiguous tensor, not preserve input's stride.
+    The CUDA kernel modifies diagonal elements in-place, preserving tensor layout.
+    We use clone() to preserve shape, dtype, device, and stride information.
     """
-    return torch.empty_like(input).contiguous()
+    return input.clone()
 
 
 @torch.library.register_fake("diagonal_ops::sub_diagonal")
@@ -163,10 +163,10 @@ def sub_diagonal_abstract(input: torch.Tensor, value: torch.Tensor) -> torch.Ten
     """
     Shape inference for sub_diagonal.
 
-    IMPORTANT: The actual CUDA kernel calls .contiguous() on both input and output,
-    so we must return a contiguous tensor, not preserve input's stride.
+    The CUDA kernel modifies diagonal elements in-place, preserving tensor layout.
+    We use clone() to preserve shape, dtype, device, and stride information.
     """
-    return torch.empty_like(input).contiguous()
+    return input.clone()
 
 
 @torch.library.register_fake("diagonal_ops::mul_diagonal")
@@ -174,10 +174,10 @@ def mul_diagonal_abstract(input: torch.Tensor, value: torch.Tensor) -> torch.Ten
     """
     Shape inference for mul_diagonal.
 
-    IMPORTANT: The actual CUDA kernel calls .contiguous() on both input and output,
-    so we must return a contiguous tensor, not preserve input's stride.
+    The CUDA kernel modifies diagonal elements in-place, preserving tensor layout.
+    We use clone() to preserve shape, dtype, device, and stride information.
     """
-    return torch.empty_like(input).contiguous()
+    return input.clone()
 
 
 @torch.library.register_fake("diagonal_ops::div_diagonal")
@@ -185,10 +185,10 @@ def div_diagonal_abstract(input: torch.Tensor, value: torch.Tensor) -> torch.Ten
     """
     Shape inference for div_diagonal.
 
-    IMPORTANT: The actual CUDA kernel calls .contiguous() on both input and output,
-    so we must return a contiguous tensor, not preserve input's stride.
+    The CUDA kernel modifies diagonal elements in-place, preserving tensor layout.
+    We use clone() to preserve shape, dtype, device, and stride information.
     """
-    return torch.empty_like(input).contiguous()
+    return input.clone()
 
 
 @torch.library.register_fake("diagonal_ops::sum_diagonal")
