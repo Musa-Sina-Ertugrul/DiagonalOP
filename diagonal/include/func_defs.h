@@ -28,7 +28,6 @@ CONCAT(func_name,_diagonal)(torch::Tensor input, torch::Tensor value){ \
     uint64_t flatten_dim = input.size(0); \
     uint64_t block_count = (flatten_dim * len + THREAD_COUNT - 1) / THREAD_COUNT; \
     c10::cuda::CUDAStream stream = c10::cuda::getCurrentCUDAStream(input.device().index()); \
-    cudaStreamSynchronize(stream); \
     if(!value.dim()){ \
         AT_DISPATCH_FLOATING_TYPES_AND(at::ScalarType::BFloat16, input.scalar_type(), "div_diagonal", [&]{ \
             auto* input_ptr = input.data_ptr<scalar_t>(); \
