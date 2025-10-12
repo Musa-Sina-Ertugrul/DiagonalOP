@@ -315,3 +315,5 @@ benchmark_results/
 *.prof
 
 .vscode
+
+CLAUDE.md
