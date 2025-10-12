@@ -9,20 +9,24 @@
 #include "diagonal_utils.h"
 #include "diagonal_add.h"
 
-CREATE_DIAGONAL_OP_INNER(add_diagonal_kernel,
+CREATE_DIAGONAL_OP_INNER(add_diagonal_kernel,//shemem step
     T* local_input = input;
     T local_value = *values;
     #pragma unroll
     for(int64_t i = 0; i < flatten_dim; i++){
-        local_input[i * len * len + len * thread_index + thread_index] += local_value;
+        shmem[current_thread] = local_input[i * len * len + len * current_thread + current_thread];
+        local_input[i * len * len + len * current_thread + current_thread] = shmem[current_thread] + local_value;
     })
 
-CREATE_DIAGONAL_OP_INNER(add_diagonal_array_kernel,
+CREATE_DIAGONAL_OP_INNER(add_diagonal_array_kernel, //shmem 2 x step
     T* local_input = input;
     T* local_value = values;
+    shmem[len + current_thread] = local_value[current_thread];
+    __syncthreads();
     #pragma unroll
     for(int64_t i = 0; i < flatten_dim; i++){
-        local_input[i * len * len + len * thread_index + thread_index] += local_value[thread_index];
+        shmem[current_thread] = local_input[i * len * len + len * current_thread + current_thread];
+        local_input[i * len * len + len * current_thread + current_thread] = shmem[current_thread] + shmem[len+current_thread] ;
     }
 )
 CREATE_DIAGONAL_OP(add)
