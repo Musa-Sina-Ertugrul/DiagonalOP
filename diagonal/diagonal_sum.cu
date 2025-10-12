@@ -42,17 +42,19 @@ __device__ __forceinline__ at::BFloat16 warp_reduce_sum<at::BFloat16>(at::BFloat
 template<typename T>
 __global__
 void
-sum_diagonal_kernel(const T* input, T* output, int64_t flatten_dim, int64_t len) {
+sum_diagonal_kernel(T* input, T* output, int64_t flatten_dim, int64_t len) {
     extern __shared__ char shared_bytes[];
     T* sdata = reinterpret_cast<T*>(shared_bytes);
 
     int64_t batch_idx = blockIdx.x;
     int64_t tid = threadIdx.x;
+    T* local_input = reinterpret_cast<T*>(input);
 
     // Each thread sums multiple diagonal elements
     T thread_sum = 0;
+    #pragma unroll
     for (int64_t i = tid; i < len; i += blockDim.x) {
-        thread_sum += input[batch_idx * len * len + i * len + i];
+        thread_sum += local_input[batch_idx * len * len + i * len + i];
     }
 
     // Warp-level reduction
@@ -87,9 +89,7 @@ sum_diagonal(torch::Tensor input) {
     int64_t len = input.size(input.dim() - 1);
     input = input.view({-1, len, len});
     int64_t flatten_dim = input.size(0);
-
-    auto output_options = torch::TensorOptions().device(input.device()).dtype(input.dtype());
-    torch::Tensor output = torch::zeros({flatten_dim}, output_options);
+    torch::Tensor output = torch::empty({flatten_dim}, input.options());
 
     c10::cuda::CUDAStream stream = c10::cuda::getCurrentCUDAStream(input.device().index());
 
