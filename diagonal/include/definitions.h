@@ -24,6 +24,10 @@
     #define THREAD_COUNT 256
 #endif
 
+#ifndef WARP_DIM
+    #define WARP_DIM 16
+#endif
+
 /** @brief Cast pointer to nv_bfloat16 pointer */
 #define BF_PTR(value) reinterpret_cast<nv_bfloat16*>(value)
 

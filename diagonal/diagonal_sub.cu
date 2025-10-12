@@ -12,22 +12,21 @@
 CREATE_DIAGONAL_OP_INNER(sub_diagonal_kernel,//shemem step
     T* local_input = input;
     T local_value = *values;
-    #pragma unroll
-    for(int64_t i = 0; i < flatten_dim; i++){
-        shmem[current_thread] = local_input[i * len * len + len * current_thread + current_thread];
-        local_input[i * len * len + len * current_thread + current_thread] = shmem[current_thread] - local_value;
-    })
+    if(threadIdx.x == 0)
+        shmem[0] = local_value;
+    __syncthreads();
+    local_input[flatten_index * len * len + len * current_thread + current_thread] -= shmem[0];
+)
 
 CREATE_DIAGONAL_OP_INNER(sub_diagonal_array_kernel, //shmem 2 x step
     T* local_input = input;
     T* local_value = values;
-    shmem[len + current_thread] = local_value[current_thread];
-    __syncthreads();
     #pragma unroll
-    for(int64_t i = 0; i < flatten_dim; i++){
-        shmem[current_thread] = local_input[i * len * len + len * current_thread + current_thread];
-        local_input[i * len * len + len * current_thread + current_thread] = shmem[current_thread] - shmem[len+current_thread] ;
+    for(uint64_t i = threadIdx.x; i < len; i += blockDim.x) {
+        shmem[i] = local_value[i];
     }
+    __syncthreads();
+    local_input[flatten_index * len * len + len * current_thread + current_thread] -= shmem[current_thread] ;
 )
 
 CREATE_DIAGONAL_OP(sub)
