@@ -149,26 +149,46 @@ def sum_diagonal_impl(input: torch.Tensor) -> torch.Tensor:
 # This allows torch.compile to perform shape analysis without running CUDA code
 @torch.library.register_fake("diagonal_ops::add_diagonal")
 def add_diagonal_abstract(input: torch.Tensor, value: torch.Tensor) -> torch.Tensor:
-    """Shape inference for add_diagonal - output shape same as input"""
-    return torch.empty_like(input)
+    """
+    Shape inference for add_diagonal.
+
+    IMPORTANT: The actual CUDA kernel calls .contiguous() on both input and output,
+    so we must return a contiguous tensor, not preserve input's stride.
+    """
+    return torch.empty_like(input).contiguous()
 
 
 @torch.library.register_fake("diagonal_ops::sub_diagonal")
 def sub_diagonal_abstract(input: torch.Tensor, value: torch.Tensor) -> torch.Tensor:
-    """Shape inference for sub_diagonal - output shape same as input"""
-    return torch.empty_like(input)
+    """
+    Shape inference for sub_diagonal.
+
+    IMPORTANT: The actual CUDA kernel calls .contiguous() on both input and output,
+    so we must return a contiguous tensor, not preserve input's stride.
+    """
+    return torch.empty_like(input).contiguous()
 
 
 @torch.library.register_fake("diagonal_ops::mul_diagonal")
 def mul_diagonal_abstract(input: torch.Tensor, value: torch.Tensor) -> torch.Tensor:
-    """Shape inference for mul_diagonal - output shape same as input"""
-    return torch.empty_like(input)
+    """
+    Shape inference for mul_diagonal.
+
+    IMPORTANT: The actual CUDA kernel calls .contiguous() on both input and output,
+    so we must return a contiguous tensor, not preserve input's stride.
+    """
+    return torch.empty_like(input).contiguous()
 
 
 @torch.library.register_fake("diagonal_ops::div_diagonal")
 def div_diagonal_abstract(input: torch.Tensor, value: torch.Tensor) -> torch.Tensor:
-    """Shape inference for div_diagonal - output shape same as input"""
-    return torch.empty_like(input)
+    """
+    Shape inference for div_diagonal.
+
+    IMPORTANT: The actual CUDA kernel calls .contiguous() on both input and output,
+    so we must return a contiguous tensor, not preserve input's stride.
+    """
+    return torch.empty_like(input).contiguous()
 
 
 @torch.library.register_fake("diagonal_ops::sum_diagonal")
