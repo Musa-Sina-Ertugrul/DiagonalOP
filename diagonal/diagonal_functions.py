@@ -51,7 +51,14 @@ class _AddDiagonal(torch.autograd.Function):
 
         Returns:
             Tuple of (grad_input, grad_value) gradients
+
+        Note:
+            torch.compile's inductor may pass non-contiguous tensors. We ensure
+            contiguity to maintain compatibility with compiled mode.
         """
+        # Ensure grad_output is contiguous for torch.compile compatibility
+        grad_output = grad_output.contiguous()
+
         grad_value = None
         if ctx.needs_input_grad[1]:
             grad_value = ctx.value.mul(reduce(mul, list(grad_output.shape[:-1])))
@@ -111,7 +118,14 @@ class _SubDiagonal(torch.autograd.Function):
 
         Returns:
             Tuple of (grad_input, grad_value) gradients
+
+        Note:
+            torch.compile's inductor may pass non-contiguous tensors. We ensure
+            contiguity to maintain compatibility with compiled mode.
         """
+        # Ensure grad_output is contiguous for torch.compile compatibility
+        grad_output = grad_output.contiguous()
+
         grad_value = None
         if ctx.needs_input_grad[1]:
             grad_value = ctx.value.mul(reduce(mul, list(grad_output.shape[:-1])) * -1)
@@ -172,8 +186,18 @@ class _MulDiagonal(torch.autograd.Function):
 
         Returns:
             Tuple of (grad_input, grad_value) gradients
+
+        Note:
+            torch.compile's inductor may pass non-contiguous tensors with transposed strides
+            during backward pass. We ensure contiguity before calling diagonal operations to
+            prevent stride mismatch assertions in compiled mode.
         """
         grad_value = None
+
+        # CRITICAL: Ensure grad_output is contiguous before passing to diagonal ops
+        # This prevents stride mismatch errors like: expected stride 3==1 at dim=2
+        grad_output = grad_output.contiguous()
+
         if _USE_REGISTERED_OPS:
             grad_output = torch.ops.diagonal_ops.mul_diagonal(grad_output, ctx.value)
         else:
@@ -242,8 +266,18 @@ class _DivDiagonal(torch.autograd.Function):
 
         Returns:
             Tuple of (grad_input, grad_value) gradients
+
+        Note:
+            torch.compile's inductor may pass non-contiguous tensors with transposed strides
+            during backward pass. We ensure contiguity before calling diagonal operations to
+            prevent stride mismatch assertions in compiled mode.
         """
         grad_value = None
+
+        # CRITICAL: Ensure grad_output is contiguous before passing to diagonal ops
+        # This prevents stride mismatch errors like: expected stride 3==1 at dim=2
+        grad_output = grad_output.contiguous()
+
         if _USE_REGISTERED_OPS:
             grad_output = torch.ops.diagonal_ops.div_diagonal(grad_output, ctx.value)
         else:
