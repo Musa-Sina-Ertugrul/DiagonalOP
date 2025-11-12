@@ -385,3 +385,9 @@ def diagonal_sum(input):
         >>> result = diagonal_sum(x)
     """
     return _SumDiagonal.apply(input)
+
+diagonal_add = torch.compiler.disable(diagonal_add)
+diagonal_sub = torch.compiler.disable(diagonal_sub)
+diagonal_mul = torch.compiler.disable(diagonal_mul)
+diagonal_div = torch.compiler.disable(diagonal_div)
+diagonal_sum = torch.compiler.disable(diagonal_sum)
